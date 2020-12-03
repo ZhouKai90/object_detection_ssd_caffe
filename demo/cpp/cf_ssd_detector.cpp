@@ -126,18 +126,19 @@ void SingleDetector::preprocess(const cv::Mat& img, std::vector<cv::Mat>* inputC
     else
         sample = img;
 
+    //图像缩放
     cv::Mat sampleResized;
     if (sample.size() != inputGeometry_)
         cv::resize(sample, sampleResized, inputGeometry_);
     else
         sampleResized = sample;
-    
+    //图像归一化（0，1）
     cv::Mat sampleFloat;
     if (numChannles_ == 3)
         sampleResized.convertTo(sampleFloat, CV_32FC3);
     else
         sampleResized.convertTo(sampleFloat, CV_32FC1);
-    
+    //通道分离，[HWC] -> [CHW]
     cv::split(sampleFloat, *inputChannels);
     CHECK(reinterpret_cast<float*>(inputChannels->at(0).data)
         == net_->input_blobs()[0]->cpu_data())

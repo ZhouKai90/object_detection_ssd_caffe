@@ -6,7 +6,7 @@ from caffe.model_libs import *
 config = edict()
 
 config.modelPrefix = 'peleenet'
-config.savePath = 'models/pedestrians_peleenet'
+config.savePath = 'models/pedestrians_peleenet_5branch_540x960'
 # The database file for training and test data. Created by tools/create_data.sh
 config.trainData = 'data/pedestrians/lmdb/pedestrians_train_lmdb'
 config.testData = 'data/pedestrians/lmdb/pedestrians_val_lmdb'
@@ -16,24 +16,24 @@ config.preTrainModel = None
 config.dataPath = 'data/pedestrians'
 
 # Specify the batch sampler.
-config.resizeHeight = 512
-config.resizeWidth = 512
+config.resizeHeight = 540
+config.resizeWidth = 960
 
 # minimum dimension of input image
 config.batchSize = 10
-config.minDim = 512
+config.minDim = 320
 config.minAspectRatio = 0.7
 config.maxAspectRatio = 1.5
 config.numClasses = 2
-config.testBatchSize = 16
+config.testBatchSize = 2
 config.numTestImg = 382
 #params for learn rate
-config.baseLr = 0.0004     # *2.5
+config.baseLr = 0.004     # *2.5
 config.lrPolicy = 'multistep'
 config.lrGamma = 0.8
-config.stepValue = [30000, 40000, 45000, 50000, 550000, 60000]
+config.stepValue = [15000, 22000, 25000, 35000, 400000, 45000, 65000, 75000]
 
-config.maxIter = 60000
+config.maxIter = 80000
 config.snapshot = 1000
 config.testInterval = 200
 
@@ -55,7 +55,7 @@ config.normalization_mode = P.Loss.VALID
 
 default = edict()
 # Modify the job name if you want.
-default.resize = "{}x{}".format(config.resizeWidth, config.resizeHeight)
+default.resize = "{}x{}".format(config.resizeHeight, config.resizeWidth)
 default.job_name = "SSD_{}".format(default.resize)
 # Directory which stores the model .prototxt file.
 default.save_dir = "{}/{}".format(config.savePath, default.job_name)

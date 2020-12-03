@@ -14,7 +14,7 @@ do
   then
     rm -f $dst_file
   fi
-  for name in Part1 Part2 Part3
+  for name in VOC2007
   do
     echo "Create list for $name $dataset..."
     dataset_file=$data_dir/$name/$sub_dir/$dataset.txt

@@ -8,16 +8,10 @@ import os
 import sys
 import argparse
 import numpy as np
-from PIL import Image, ImageDraw
 import cv2
 import random
-# Make sure that caffe is on the python path:
-# caffe_root='../../caffe_ssd'
-# os.chdir(caffe_root)
-# sys.path.insert(0, os.path.join(caffe_root, 'python'))
+
 import caffe
-from itertools import islice
-from xml.dom.minidom import Document
 
 from google.protobuf import text_format
 from caffe.proto import caffe_pb2
@@ -53,14 +47,15 @@ class CaffeDetection:
         else:
             if isinstance (data_shape, int):
                 data_shape = (data_shape, data_shape)
-        self.data_shape = data_shape
+        self.data_shape = data_shape    #(h, w)
         self.transformer = caffe.io.Transformer({'data': (1, 3, data_shape[0], data_shape[1])})
-        # self.transformer = caffe.io.Transformer({'data': self.net.blobs['data'].data.shape})
+        # change into (C,H,W) instead of (H,W,C)
         self.transformer.set_transpose('data', (2, 0, 1))
         # self.transformer.set_mean('data', np.array([127.5, 127.5, 127.5])) # mean pixel
+        self.transformer.set_mean('data', np.array([104, 117, 123]))  # mean pixel
         # the reference model operates on images in [0,255] range instead of [0,1]
-        self.transformer.set_input_scale('data', 0.007843)
         self.transformer.set_raw_scale('data', 255)
+        #self.transformer.set_input_scale('data', 0.007843) ??????
         # the reference model has channels in BGR order instead of RGB
         self.transformer.set_channel_swap('data', (2, 1, 0))
 
@@ -69,14 +64,15 @@ class CaffeDetection:
         self.labelmap = caffe_pb2.LabelMap()
         text_format.Merge(str(file.read()), self.labelmap)
 
-    def detect(self, image_file, conf_thresh=0.3, topn=100):
+    def detect(self, image_file, conf_thresh=0.5, topn=100):
         '''
         SSD detection
         '''
         # set net to batch size of 1
         # print(self.data_shape)
-        self.net.blobs['data'].reshape(1, 3, self.data_shape[0], self.data_shape[1])
-        image = caffe.io.load_image(image_file) * 255
+        # self.net.blobs['data'].reshape(1, 3, self.data_shape[0], self.data_shape[1])
+
+        image = caffe.io.load_image(image_file)
 
         #Run the net and examine the top_k results
         transformed_image = self.transformer.preprocess('data', image)
@@ -84,13 +80,14 @@ class CaffeDetection:
 
         # Forward pass.
         #detections = self.net.forward()['detection_out']
+
         self.net.forward()
-        detections = self.net.blobs['detection'].data[...]
+        detections = self.net.blobs['detection_out'].data[...]
         print(detections.shape)
         # exit()
         # Parse the outputs.
-        print(detections[0,0,0,:])
-        print(detections[0,0,1,:])
+        # print(detections[0,0,0,:])
+        # print(detections[0,0,1,:])
         # exit()
         det_label = detections[0,0,:,1]
         det_conf = detections[0,0,:,2]
@@ -99,9 +96,11 @@ class CaffeDetection:
         det_xmax = detections[0,0,:,5]
         det_ymax = detections[0,0,:,6]
 
-        # Get detections with confidence higher than 0.6.
+        # Get detections with confidence higher than conf_thresh.
         top_indices = [i for i, conf in enumerate(det_conf) if conf >= conf_thresh]
+
         top_conf = det_conf[top_indices]
+        print("top conf:", top_conf)
         top_label_indices = det_label[top_indices].tolist()
         print('lablelmap:', self.labelmap)
         print('top_label_indices:', top_label_indices)
@@ -150,8 +149,8 @@ def main(args):
         #print('shape')
         #print(imgshape)
         # colors = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-        red = (255, 0, 0)
-        green = (0, 255, 0)
+        red = (0, 0, 255)
+        blue = (255, 0, 0)
         for item in result:
             xmin = int(round(item[0] * imgshape[1]))
             ymin = int(round(item[1] * imgshape[0]))
@@ -161,9 +160,9 @@ def main(args):
             if xmin<=0 or ymin<=0 or xmax<=0 or ymax<=0:
                 print('Out of boundary.\n')
                 continue
-            if item[-1] == 'hat':
-                colors = green
-            else:
+            if item[-1] == 'helmet':
+                colors = blue
+            elif item[-1] == 'face':
                 colors = red
             cv2.rectangle(img, (round(xmin), round(ymin)),
                             (round(xmax), round(ymax)), colors, 2)
@@ -186,16 +185,27 @@ def parse_args():
     '''parse args'''
     parser = argparse.ArgumentParser()
     parser.add_argument('--gpu_id', type=int, default=1, help='gpu id')
+    parser.add_argument('--data_shape', default=(540, 960), type=int)
+    # parser.add_argument('--labelmap_file',
+    #                     default=os.path.join(os.getcwd(), '../../', 'models/person_detection/person_labelmap_voc.prototxt'))
+    # parser.add_argument('--model_weights',
+    #                     default=os.path.join(os.getcwd(), '../../', 'models/person_detection/pelee_ssd_person.caffemodel'))
+    # parser.add_argument('--model_def',
+    #                    default=os.path.join(os.getcwd(), '../../', 'models/person_detection/pelee_ssd_person.prototxt'))
+
     parser.add_argument('--labelmap_file',
-                        default=os.path.join(os.getcwd(), '../../', 'models/deploy/labelmap_voc.prototxt'))
-    parser.add_argument('--model_def',
-                       default=os.path.join(os.getcwd(), '../../', 'models/deploy/half_VGG16_SSD_512.prototxt'))
-    parser.add_argument('--data_shape', default=(512, 512), type=int)
+                        default=os.path.join(os.getcwd(), '../../', 'models/safehat/helmet_labelmap_voc.prototxt'))
     parser.add_argument('--model_weights',
-                        default=os.path.join(os.getcwd(), '../../', 'models/deploy/half_VGG16_SSD_512.caffemodel'))
-    parser.add_argument('--save_path', default=os.path.join(os.getcwd(), '../../', 'output/'))
-    parser.add_argument('--image_dir', default=os.path.join(os.getcwd(), '../../', 'images/tianyin/'))
+                        default=os.path.join(os.getcwd(), '../../', 'models/safehat/pelee_helmet.caffemodel'))
+    parser.add_argument('--model_def',
+                       default=os.path.join(os.getcwd(), '../../', 'models/safehat/pelee_helmet.prototxt'))
+
+    parser.add_argument('--save_path', default=os.path.join(os.getcwd(), '../../', 'output/helmet/'))
+    parser.add_argument('--image_dir', default=os.path.join(os.getcwd(), '../../', 'images/helmet/'))
     return parser.parse_args()
 
 if __name__ == '__main__':
     main(parse_args())
+
+
+
